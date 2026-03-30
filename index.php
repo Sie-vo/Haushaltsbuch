@@ -5,7 +5,7 @@ Copyright (c) 2026 Dennis Vorpahl
 https://sievo.de
 info@sievo.de
 
-install.php Version 1.0.0 
+index.php Version 1.0.0 
 
 Diese Datei ist Teil von Sievo Haushaltsbuch.
 
@@ -21,62 +21,56 @@ Diese Datei ist Teil von Sievo Haushaltsbuch.
 
     Sie sollten eine Kopie der GNU General Public License zusammen mit diesem
     Programm erhalten haben. Wenn nicht, siehe <https://www.gnu.org/licenses/>.*/
+require_once 'auth.php';
+require_once 'db.php';
 require_once "header.php";
-require_once "db.php";
 
-echo ' <!-- Main Content Canvas -->
-    <main class="flex-grow-1 p-4 p-md-5">
-      <header class="mb-4">
-        <h1 class="display-5 fw-bold mb-2">Installation</h1>
-        <p class="text-secondary fw-medium">Installieren von Sievo Haushaltsbuch.</p>
-      </header>';
-if (empty($db_host) || empty($db_user) || empty($db_pass) || empty($db_name)) {
-    echo '<div class="alert alert-warning">Du musst noch die Datenbankverbindung in der db.php eintragen.</div>';
-    echo '<button class="btn btn-primary" onclick="window.location.href=\'install.php\'">Nochmal versuchen</button>';
-    echo '</main>';
-    include "footer.php";
-    exit;
+$stmt = $pdo->prepare("SELECT * FROM ".$dbprefix."transactions WHERE user_id = :user ORDER BY created_at DESC");
+$stmt->execute(['user' => $_SESSION['user_id']]);
+$transactions = $stmt->fetchAll();
+
+$income = 0;
+$expense = 0;
+
+foreach ($transactions as $t) {
+    if ($t['type'] === 'income') {
+        $income += $t['amount'];
+    } else {
+        $expense += $t['amount'];
+    }
 }
-try {
-    
-    $pdo->exec("CREATE TABLE ".$dbprefix."users (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        email VARCHAR(255) UNIQUE NOT NULL,
-        password VARCHAR(255) NOT NULL
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
-    $pdo->exec("CREATE TABLE ".$dbprefix."categories (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(100) NOT NULL
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+$balance = $income - $expense;
+?>
+ <main class="flex-grow-1 p-4 p-md-5">
+      <header class="mb-4">
+        <h1 class="display-5 fw-bold mb-2">Haushaltsbuch</h1>
+        <p class="text-secondary fw-medium">Deine Übersicht</p>
+      </header>
 
-    $pdo->exec("CREATE TABLE ".$dbprefix."settings (
-        name VARCHAR(100) NOT NULL PRIMARY KEY,
-        value VARCHAR(100) NOT NULL
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+<p>Einnahmen: <?= $income ?> €</p>
+<p>Ausgaben: <?= $expense ?> €</p>
+<p><strong>Saldo: <?= $balance ?> €</strong></p>
 
-    $pdo->exec("CREATE TABLE ".$dbprefix."transactions (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        user_id INT NOT NULL,
-        category_id INT NOT NULL DEFAULT 1,
-        amount DECIMAL(10,2) NOT NULL,
-        type ENUM('income','expense') NOT NULL,
-        description VARCHAR(255) NOT NULL,
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+<a href="add.php" class="btn btn-primary">+ Neue Buchung</a>
 
-        FOREIGN KEY (user_id) REFERENCES ".$dbprefix."users(id),
-        FOREIGN KEY (category_id) REFERENCES ".$dbprefix."categories(id)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+<table>
+    <tr>
+        <th>Datum</th>
+        <th>Betrag</th>
+        <th>Typ</th>
+        <th>Beschreibung</th>
+    </tr>
 
-    $pdo->exec("INSERT INTO ".$dbprefix."settings (name, value) VALUES ('register', '0')");
-
-    echo "<p>Die Installation ist abgeschlossen! Die Datenbanktabellen wurden erstellt.</p>";
-    echo "<p>Bitte lösche aus Sicherheitsgründen die install.php Datei.</p>";
-    echo '<button class="btn btn-primary" onclick="window.location.href=\'register.php\'">Zum Benutzer anlegen</button>';
-} catch (PDOException $e) {
-    echo "Fehler bei der Installation: " . $e->getMessage();
-    echo '<button class="btn btn-primary" onclick="window.location.href=\'install.php\'">Nochmal versuchen</button>';
-}#
-
-echo '</main>';
+    <?php foreach ($transactions as $t): ?>
+    <tr>
+        <td><?= $t['created_at'] ?></td>
+        <td><?= $t['amount'] ?> €</td>
+        <td><?= $t['type'] ?></td>
+        <td><?= $t['description'] ?></td>
+    </tr>
+    <?php endforeach; ?>
+</table>
+</main>
+<?php
 include "footer.php";
